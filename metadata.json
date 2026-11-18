@@ -1,0 +1,6 @@
+{
+  "name": "Zayan Authenticator",
+  "description": "Production-grade offline TOTP 2FA authenticator with zero-knowledge AES-256-GCM encrypted Firebase cloud backup and multi-device recovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

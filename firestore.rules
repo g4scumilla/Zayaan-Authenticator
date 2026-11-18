@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null &&
+             request.auth.uid != null &&
+             request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidVaultBackup(data) {
+      return data.userId is string &&
+             data.userId.size() >= 1 &&
+             data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.encryptedPayload is string &&
+             data.encryptedPayload.size() >= 16 &&
+             data.encryptedPayload.size() <= 900000 &&
+             data.vaultIv is string &&
+             data.vaultIv.size() >= 16 &&
+             data.vaultIv.size() <= 32 &&
+             data.wrappedVek is string &&
+             data.wrappedVek.size() >= 32 &&
+             data.wrappedVek.size() <= 128 &&
+             data.wrapIv is string &&
+             data.wrapIv.size() >= 16 &&
+             data.wrapIv.size() <= 32 &&
+             data.kdfAlgorithm is string &&
+             data.kdfAlgorithm.size() <= 32 &&
+             data.kdfAlgorithm == 'PBKDF2WithHmacSHA256' &&
+             data.kdfIterations is int &&
+             data.kdfIterations >= 600000 &&
+             data.kdfIterations <= 2000000 &&
+             data.kdfSalt is string &&
+             data.kdfSalt.size() >= 16 &&
+             data.kdfSalt.size() <= 64 &&
+             data.encryptionVersion is int &&
+             data.encryptionVersion == 1 &&
+             data.schemaVersion is int &&
+             data.schemaVersion >= 1 &&
+             data.schemaVersion <= 10 &&
+             data.backupVersion is int &&
+             data.backupVersion >= 1 &&
+             data.lastDeviceId is string &&
+             data.lastDeviceId.size() >= 1 &&
+             data.lastDeviceId.size() <= 64 &&
+             data.lastDeviceId.matches('^[a-zA-Z0-9_\\-]+$') &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/vault/{vaultId} {
+      allow get: if isOwner(userId) && isValidId(vaultId) && vaultId == 'main';
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(vaultId) &&
+                       vaultId == 'main' &&
+                       incoming().keys().hasAll([
+                         'userId', 'encryptedPayload', 'vaultIv', 'wrappedVek', 'wrapIv',
+                         'kdfAlgorithm', 'kdfIterations', 'kdfSalt', 'encryptionVersion',
+                         'schemaVersion', 'backupVersion', 'lastDeviceId', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'encryptedPayload', 'vaultIv', 'wrappedVek', 'wrapIv',
+                         'kdfAlgorithm', 'kdfIterations', 'kdfSalt', 'encryptionVersion',
+                         'schemaVersion', 'backupVersion', 'lastDeviceId', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt <= request.time &&
+                       incoming().updatedAt <= request.time &&
+                       isValidVaultBackup(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(vaultId) &&
+                       vaultId == 'main' &&
+                       isValidVaultBackup(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt <= request.time &&
+                       incoming().backupVersion > existing().backupVersion &&
+                       (
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'encryptedPayload', 'vaultIv', 'schemaVersion',
+                           'backupVersion', 'lastDeviceId', 'updatedAt'
+                         ]) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'encryptedPayload', 'vaultIv', 'wrappedVek', 'wrapIv',
+                           'kdfAlgorithm', 'kdfIterations', 'kdfSalt', 'encryptionVersion',
+                           'schemaVersion', 'backupVersion', 'lastDeviceId', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(vaultId) && vaultId == 'main';
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "VaultBackup": {
+      "title": "VaultBackup",
+      "description": "Zero-knowledge AES-256-GCM encrypted TOTP vault stored per user. Never contains plaintext secrets or recovery passwords.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID matching request.auth.uid."
+        },
+        "encryptedPayload": {
+          "type": "string",
+          "description": "Base64-encoded AES-256-GCM ciphertext and authentication tag of the serialized TOTP vault."
+        },
+        "vaultIv": {
+          "type": "string",
+          "description": "Base64-encoded 12-byte random AES-GCM nonce for encryptedPayload."
+        },
+        "wrappedVek": {
+          "type": "string",
+          "description": "Base64-encoded AES-256-GCM wrapped 256-bit Vault Encryption Key (VEK) encrypted using the PBKDF2-derived KEK."
+        },
+        "wrapIv": {
+          "type": "string",
+          "description": "Base64-encoded 12-byte random AES-GCM nonce for wrappedVek."
+        },
+        "kdfAlgorithm": {
+          "type": "string",
+          "enum": ["PBKDF2WithHmacSHA256"],
+          "description": "Key derivation function algorithm identifier."
+        },
+        "kdfIterations": {
+          "type": "integer",
+          "description": "PBKDF2 iteration count (minimum 600000)."
+        },
+        "kdfSalt": {
+          "type": "string",
+          "description": "Base64-encoded cryptographically random salt for PBKDF2."
+        },
+        "encryptionVersion": {
+          "type": "integer",
+          "description": "Cryptographic envelope version (1 = AES-256-GCM + PBKDF2-HMAC-SHA256)."
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "description": "Vault JSON payload schema version."
+        },
+        "backupVersion": {
+          "type": "integer",
+          "description": "Monotonically increasing backup version used for optimistic concurrency and conflict detection."
+        },
+        "lastDeviceId": {
+          "type": "string",
+          "description": "Anonymous random installation UUID of the device that wrote this version."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the cloud vault was first created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest vault backup (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "encryptedPayload",
+        "vaultIv",
+        "wrappedVek",
+        "wrapIv",
+        "kdfAlgorithm",
+        "kdfIterations",
+        "kdfSalt",
+        "encryptionVersion",
+        "schemaVersion",
+        "backupVersion",
+        "lastDeviceId",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/vault/{vaultId}": {
+      "schema": {
+        "$ref": "#/entities/VaultBackup"
+      },
+      "description": "Zero-knowledge encrypted authenticator vault document at users/{uid}/vault/main."
+    }
+  }
+}
